@@ -482,6 +482,88 @@ check("playlist state: v1.1 copy recognized only at its original position",
 _sh0.rmtree(_legacy_playlist_dir, ignore_errors=True)
 
 from lucidadl.downloader import preview_tracks as _preview_tracks
+from lucidadl.downloader import _resolve_targets as _resolve_targets
+from lucidadl.api import LucidaError as _LucidaError
+
+class _AmazonRegionClient:
+    def __init__(self, successful_country, invalid_page=None):
+        self.successful_country = successful_country
+        self.invalid_page = invalid_page
+        self.countries = []
+
+    async def fetch_page_data(self, url, region):
+        self.countries.append(region)
+        if region != self.successful_country:
+            if self.invalid_page is not None:
+                return self.invalid_page
+            raise _LucidaError("territory unavailable")
+        return {"info": {"type": "track", "url": url, "title": "Song",
+                          "producers": ["p"]},
+                "token": "token", "tokenExpiry": 1}
+
+    tracks_from_pd = staticmethod(LucidaClient.tracks_from_pd)
+
+_amazon_regions = _AmazonRegionClient("GB")
+_amazon_targets = _aio.run(_resolve_targets(
+    _amazon_regions, "https://music.amazon.co.uk/tracks/123", "track",
+    "qobuz", "US", False, lambda *_: None))
+check("Amazon region fallback: auto, US, then GB; target keeps resolved country",
+      _amazon_regions.countries == ["", "US", "GB"]
+      and _amazon_targets and _amazon_targets[0].get("country") == "GB"
+      and _amazon_targets[0].get("csrf") == "token")
+
+_amazon_auto = _AmazonRegionClient("")
+_auto_targets = _aio.run(_resolve_targets(
+    _amazon_auto, "https://music.amazon.com/tracks/123", "track",
+    "amazon", None, False, lambda *_: None))
+check("Amazon region fallback stops after automatic resolution succeeds",
+      _amazon_auto.countries == [""] and _auto_targets[0]["country"] == "")
+
+for _invalid_page in ({"info": {}}, {
+        "info": {"type": "track", "url": "https://music.amazon.com/tracks/123"},
+        "tokenExpiry": 1}):
+    _amazon_jp = _AmazonRegionClient("JP", _invalid_page)
+    _jp_targets = _aio.run(_resolve_targets(
+        _amazon_jp, "https://music.amazon.co.jp/tracks/123", "track",
+        "qobuz", "US", False, lambda *_: None))
+    check("Amazon fallback rejects parsed pages without a usable track/token",
+          _amazon_jp.countries == ["", "US", "GB", "JP"]
+          and _jp_targets[0]["country"] == "JP")
+
+_amazon_failed = _AmazonRegionClient(None)
+try:
+    _aio.run(_resolve_targets(
+        _amazon_failed, "https://music.amazon.com/tracks/123", "track",
+        "amazon", "US", False, lambda *_: None))
+except _LucidaError as _region_error:
+    check("Amazon fallback raises after all regions fail",
+          _amazon_failed.countries == ["", "US", "GB", "JP"]
+          and str(_region_error) == "territory unavailable")
+else:
+    check("Amazon fallback raises after all regions fail", False)
+
+_qobuz_client = _AmazonRegionClient("US")
+_qobuz_targets = _aio.run(_resolve_targets(
+    _qobuz_client, "https://play.qobuz.com/track/123", "track",
+    "amazon", "US", False, lambda *_: None))
+check("Direct Qobuz URL keeps its country even with Amazon preferred",
+      _qobuz_client.countries == ["US"] and "country" not in _qobuz_targets[0])
+
+# Exercise the handoff without making requests or creating audio files.
+from unittest.mock import AsyncMock as _AsyncMock, Mock as _Mock
+from lucidadl.downloader import _download_target
+for _target, _expected_country in ((_amazon_targets[0], "GB"),
+                                    (_auto_targets[0], ""),
+                                    (_qobuz_targets[0], "US")):
+    _handoff_client = _Mock()
+    _handoff_client.start_download = _AsyncMock(return_value=("handoff", "server"))
+    _handoff_client.run_job = _AsyncMock(return_value=__file__)
+    _aio.run(_download_target(
+        _handoff_client, _Mock(), _target, "US", _os.getcwd(), False, False,
+        None, _Mock(), {"ok": 0, "skip": 0, "fail": 0}, [], _aio.Lock()))
+    check("Download handoff preserves resolved country " + repr(_expected_country),
+          _handoff_client.start_download.await_args.args[2] == _expected_country)
+
 class _PreviewClient:
     async def search(self, query, _service):
         if "Missing" in query:

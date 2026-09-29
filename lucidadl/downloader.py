@@ -1,7 +1,8 @@
 """Async orchestration over the FAST HTTP path (no browser).
 
 Phase 1 (resolve): each line -> item URL (search via httpx, with service fallback for
-free-text queries), then ONE httpx GET of the item page -> token + every track.
+free-text queries), then fetch the item page -> token + every track, with regional
+fallback for Amazon.
 Phase 2 (download): per track, httpx POST /api/load + poll + stream the file from the
 Cloudflare-free <server>.lucida.to. Failed items are collected for an easy retry."""
 
@@ -11,6 +12,7 @@ import asyncio
 import os
 import re
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 from . import matching, organize, progress, transcode, utils
 from .api import LucidaClient, LucidaError, FALLBACK_SERVICES, normalize_service, _long
@@ -155,7 +157,31 @@ async def _resolve_targets(client, line, kind, service, country, strict, log,
     url = await _resolve_url(client, line, service, kind, log, strict, quiet=quiet)
     if not url:
         return None
-    pd = await client.fetch_page_data(url, country)        # ONE httpx GET
+    host = (urlparse(url).hostname or "").lower()
+    amazon = host.startswith("music.amazon.")
+    resolved_country = country
+    if amazon:
+        # Amazon search results can point at a territorial storefront. Try the
+        # automatic resolver first, then the small set of known storefronts.
+        last_error = None
+        for candidate in ("", "US", "GB", "JP"):
+            try:
+                pd = await client.fetch_page_data(url, candidate)
+                info = pd.get("info") or {}
+                if (info.get("type") not in ("track", "album")
+                        or pd.get("tokenExpiry") is None
+                        or not any(t.get("url") and t.get("csrf")
+                                   and t.get("producers", "x") is not None
+                                   for t in client.tracks_from_pd(pd))):
+                    raise LucidaError("Amazon page has no available tracks with a token")
+                resolved_country = candidate
+                break
+            except Exception as exc:
+                last_error = exc
+        else:
+            raise last_error
+    else:
+        pd = await client.fetch_page_data(url, country)  # ONE httpx GET
     info = pd.get("info", {}) or {}
     expiry = pd.get("tokenExpiry")
     is_album = info.get("type") == "album"
@@ -163,9 +189,12 @@ async def _resolve_targets(client, line, kind, service, country, strict, log,
     for t in client.tracks_from_pd(pd):
         if t.get("producers", "x") is None or not t.get("url"):  # unavailable
             continue
-        targets.append({"url": t["url"], "label": t.get("title") or line,
+        target = {"url": t["url"], "label": t.get("title") or line,
                         "csrf": t.get("csrf"), "csrfFallback": t.get("csrfFallback"),
-                        "expiry": expiry, "meta": _track_meta(info, t, is_album)})
+                        "expiry": expiry, "meta": _track_meta(info, t, is_album)}
+        if amazon:
+            target["country"] = resolved_country
+        targets.append(target)
     if not targets:
         return None
     if is_album:
@@ -233,7 +262,8 @@ async def _download_target(client, state, target, country, out, dedup, organize_
     path, last_err = None, None
     for attempt in range(2):
         try:
-            handoff, server = await client.start_download(track, target["expiry"], country)
+            handoff, server = await client.start_download(
+                track, target["expiry"], target.get("country", country))
             path = await client.run_job(
                 handoff, server, _dest_dir(out, organize_on), utils.sanitize(label),
                 title=label,

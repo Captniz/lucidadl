@@ -32,8 +32,16 @@ keeps your library organized.
 
 Supported public playlist sources: **Apple Music, Spotify, Deezer, YouTube/YouTube
 Music, Amazon Music, TIDAL, SoundCloud, and Qobuz.** Playlist sources and download
-providers are separate: playlists can originate from any supported service, while Lucida
-currently resolves downloads through **Qobuz and Amazon Music**.
+providers are separate: playlists can originate from any supported service, while
+lucidadl resolves downloads through Lucida's **Qobuz and Amazon Music** providers when
+they are available.
+
+> **Upstream status — last checked 29 September 2026:** lucida.to has recently been
+> unstable. Amazon Music resolves through the US, UK, and Japan account regions, but
+> availability can vary by region. Qobuz did not resolve during the latest Qobuz check.
+> This is an upstream service status, not a limitation of playlist importing. Run
+> `lucida setup` before retrying, and expect provider availability to change without a
+> lucidadl release.
 
 ![lucidadl public playlist import demo](https://raw.githubusercontent.com/Jude-A/lucidadl/main/docs/assets/lucidadl-demo.gif)
 
