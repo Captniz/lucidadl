@@ -18,6 +18,7 @@ dynamically.
 from __future__ import annotations
 
 import asyncio
+import base64
 import html as html_lib
 import json
 import os
@@ -37,7 +38,13 @@ _PD_END = ',"uses":{"url":1}}];'
 
 SERVICE_ALIASES = {"amazon_music": "amazon", "yandex_music": "yandex"}
 # Qobuz on lucida.to currently only accepts "US"; Amazon works WITHOUT a country.
-COUNTRY_DEFAULTS = {"qobuz": "US", "amazon": "", "deezer": "FR"}
+COUNTRY_DEFAULTS = {
+    "qobuz": "US", "amazon": "", "deezer": "FR",
+    "grilledcheese": "",
+}
+# Lucida exposes this provider under the pseudo-country XX in search, while its
+# item page and download form use the automatic account selector.
+SEARCH_COUNTRY_DEFAULTS = {"grilledcheese": "XX"}
 # Services tried (in order) when the primary one finds nothing (unless --strict).
 FALLBACK_SERVICES = ["qobuz", "amazon"]
 PLAYLIST_SOURCE_NAMES = {
@@ -98,6 +105,36 @@ def normalize_service(service: str) -> str:
 
 def default_country(service: str) -> str:
     return COUNTRY_DEFAULTS.get(normalize_service(service), "US")
+
+
+def search_country(service: str) -> str:
+    svc = normalize_service(service)
+    return SEARCH_COUNTRY_DEFAULTS.get(svc, default_country(svc))
+
+
+def _account_country_for_url(url: str, country: Optional[str]) -> str:
+    """Translate Lucida's search-only XX pseudo-country back to Auto-select."""
+    cc = country or ""
+    if cc.upper() != "XX":
+        return cc
+    parsed = urlparse(url or "")
+    host = (parsed.hostname or "").lower()
+    if host == "lucida.to" and parsed.path.startswith("/i/gc1_"):
+        return ""
+    return cc
+
+
+def _decode_single_track_token(token: Any) -> Any:
+    """Mirror the web UI's two atob() calls for single-track page tokens."""
+    if not isinstance(token, str) or not token:
+        return token
+    decoded = token
+    try:
+        for _ in range(2):
+            decoded = base64.b64decode(decoded.encode("ascii"), validate=True).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return token
+    return decoded
 
 
 def playlist_source(url: str) -> str:
@@ -241,7 +278,7 @@ class LucidaClient:
         import pyjson5
 
         svc = normalize_service(service)
-        cc = default_country(svc)
+        cc = search_country(svc)
         params = {"service": svc}
         if cc:
             params["country"] = cc
@@ -265,6 +302,7 @@ class LucidaClient:
         import pyjson5
 
         cc = country if country is not None else self.country
+        cc = _account_country_for_url(svc_url, cc)
         params = {"url": svc_url}
         if cc:
             params["country"] = cc
@@ -283,7 +321,7 @@ class LucidaClient:
         if info.get("type") == "album":
             return list(info.get("tracks", []) or [])
         t = dict(info)
-        t.setdefault("csrf", pd.get("token"))
+        t.setdefault("csrf", _decode_single_track_token(pd.get("token")))
         t.setdefault("csrfFallback", None)
         return [t]
 
@@ -292,6 +330,7 @@ class LucidaClient:
     async def start_download(self, track: Dict[str, Any], expiry: Any,
                              country: Optional[str] = None) -> Tuple[str, str]:
         cc = country if country is not None else self.country
+        cc = _account_country_for_url(track.get("url", ""), cc)
         body = {
             "account": {"id": cc or "auto", "type": "country"}, "compat": False,
             "downscale": self.downscale, "handoff": True, "metadata": self.metadata,

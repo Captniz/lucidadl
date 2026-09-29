@@ -11,8 +11,8 @@
 [lucida.to](https://lucida.to).**
 
 Paste a track, album, text list, or public playlist. lucidadl extracts the titles, finds
-matching Qobuz or Amazon Music results through Lucida, downloads them in parallel, and
-keeps your library organized.
+matching results through Lucida, downloads them in parallel, and keeps your library
+organized.
 
 > **Official project:** [github.com/Jude-A/lucidadl](https://github.com/Jude-A/lucidadl)
 >
@@ -24,7 +24,7 @@ keeps your library organized.
 
 | Input | Result |
 |---|---|
-| Track or album search | Automatic Qobuz search with Amazon fallback |
+| Track or album search | Qobuz, Amazon Music, or GrilledCheese through Lucida |
 | Large `.txt` list | Parallel downloads with deduplication and retry |
 | Public streaming playlist | Ordered import from eight supported services |
 | FLAC source | Optional local MP3, AAC, Opus, Ogg, WAV, or FLAC conversion |
@@ -33,15 +33,15 @@ keeps your library organized.
 Supported public playlist sources: **Apple Music, Spotify, Deezer, YouTube/YouTube
 Music, Amazon Music, TIDAL, SoundCloud, and Qobuz.** Playlist sources and download
 providers are separate: playlists can originate from any supported service, while
-lucidadl resolves downloads through Lucida's **Qobuz and Amazon Music** providers when
-they are available.
+lucidadl resolves downloads through Lucida's **Qobuz, Amazon Music, and GrilledCheese**
+providers when they are available.
 
 > **Upstream status — last checked 29 September 2026:** lucida.to has recently been
 > unstable. Amazon Music resolves through the US, UK, and Japan account regions, but
-> availability can vary by region. Qobuz did not resolve during the latest Qobuz check.
-> This is an upstream service status, not a limitation of playlist importing. Run
-> `lucida setup` before retrying, and expect provider availability to change without a
-> lucidadl release.
+> availability can vary by region. GrilledCheese completed a real FLAC download; Qobuz
+> did not resolve during its latest check. This is upstream service status, not a
+> limitation of playlist importing. Run `lucida setup` before retrying, and expect
+> provider availability to change without a lucidadl release.
 
 ![lucidadl public playlist import demo](https://raw.githubusercontent.com/Jude-A/lucidadl/main/docs/assets/lucidadl-demo.gif)
 
@@ -225,7 +225,7 @@ Useful download options:
 | Option | Purpose |
 |---|---|
 | `-j, --jobs N` | Parallel downloads, from 1 to 100 (default: 3) |
-| `-s, --service` | Primary search service: `qobuz` or `amazon` |
+| `-s, --service` | Search service: `qobuz`, `amazon`, or `grilledcheese` |
 | `--to FORMAT` | Local conversion to MP3, AAC/M4A, Opus, Ogg, FLAC, or WAV |
 | `--bitrate RATE` | Conversion bitrate such as `320k` or `192k` |
 | `--keep-original` | Keep the source FLAC after conversion |

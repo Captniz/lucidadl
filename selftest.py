@@ -4,7 +4,8 @@ import asyncio as _aio
 
 from lucidadl import utils, matching
 from lucidadl.api import (
-    LucidaClient, normalize_service, default_country, _long, _apple_tracks_from_obj,
+    LucidaClient, normalize_service, default_country, search_country,
+    _account_country_for_url, _long, _apple_tracks_from_obj,
     _apple_playlist_from_scripts, is_apple_playlist_url, playlist_source,
     _spotify_playlist_from_html, _spotify_total_from_html,
     _deezer_playlist_from_obj, _tidal_playlist_from_html, _tidal_items_from_obj,
@@ -39,6 +40,13 @@ check("sanitize_filename strips bad chars", "/" not in utils.sanitize_filename("
 check("normalize amazon_music", normalize_service("amazon_music") == "amazon")
 check("default_country qobuz=US", default_country("qobuz") == "US")
 check("default_country amazon=''", default_country("amazon") == "")
+check("download country for grilledcheese is auto",
+      default_country("grilledcheese") == "")
+check("search country for grilledcheese is XX",
+      search_country("grilledcheese") == "XX")
+check("XX becomes auto only for a grilledcheese item URL",
+      _account_country_for_url("https://lucida.to/i/gc1_token", "XX") == ""
+      and _account_country_for_url("https://play.qobuz.com/track/1", "XX") == "XX")
 check("default_country other=US", default_country("tidal") == "US")
 check("formats", DOWNSCALE_CHOICES[0] == "original" and "flac" in DOWNSCALE_CHOICES)
 check("Apple URL validation accepts playlists only",
@@ -620,9 +628,16 @@ _alb = ('{info:{success:true,type:"album",title:"Cal",tracks:['
 _tracks = LucidaClient.tracks_from_pd(pyjson5.loads(_alb))
 check("pd album -> 2 tracks w/ csrf", len(_tracks) == 2 and _tracks[0]["csrf"] == "C1")
 check("pd album null producers kept", _tracks[1].get("producers") is None)
+_encoded_token = "VmxKT01IRkdiblkyVVZWUmJrVk5iVkEzTUZJelVVOXpRV3c0"
 _trk = LucidaClient.tracks_from_pd(pyjson5.loads(
-    '{info:{type:"track",title:"X",url:"https://q/track/9",producers:["p"]},token:"TT",tokenExpiry:9}'))
-check("pd single track csrf=token", len(_trk) == 1 and _trk[0]["csrf"] == "TT")
+    '{info:{type:"track",title:"X",url:"https://q/track/9",producers:["p"]},'
+    f'token:"{_encoded_token}",tokenExpiry:9}}'))
+check("pd single track token mirrors the UI's double decode",
+      len(_trk) == 1 and _trk[0]["csrf"] == "VRN0qFnv6QUQnEMmP70R3QOsAl8")
+_legacy_trk = LucidaClient.tracks_from_pd(pyjson5.loads(
+    '{info:{type:"track",title:"X",url:"https://q/track/9"},token:"TT"}'))
+check("pd single track keeps an unencoded legacy token",
+      _legacy_trk[0]["csrf"] == "TT")
 check("_between slices blob",
       _between('x,{"type":"data","data":{a:1},"uses":{"url":1}}];y',
                ',{"type":"data","data":', ',"uses":{"url":1}}];') == "{a:1}")

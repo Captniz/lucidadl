@@ -16,7 +16,7 @@ from . import paths, transcode
 from .session import load_clearance
 
 _TO_NONE = "(none — keep the source format)"
-_SERVICES = ["qobuz", "amazon"]
+_SERVICES = ["qobuz", "amazon", "grilledcheese"]
 # actions whose output is worth reading before the menu redraws (we pause after them)
 _PAUSE_AFTER = {"download", "playlist", "batch", "retry", "tools", "onboarding"}
 

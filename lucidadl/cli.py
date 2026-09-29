@@ -201,7 +201,7 @@ def _exit_if_failed(result: RunResult) -> None:
 
 def _service_opts(f):
     f = click.option("-s", "--service", default="qobuz",
-                     help="Source service (qobuz by default, amazon).")(f)
+                     help="Source service (qobuz by default; amazon, grilledcheese).")(f)
     f = click.option("--country", default=None, help="Country code (def: US for qobuz).")(f)
     f = click.option("-F", "--format", "downscale", default="original",
                      type=click.Choice(DOWNSCALE_CHOICES),
