@@ -1,6 +1,8 @@
 ## What & why
 
-<!-- What does this change, and why? Link any related issue (e.g. Closes #12). -->
+<!-- Explain the purpose and resulting behavior in plain language. Keep this focused on
+     the project; omit personal circumstances and private conversation context.
+     Link any related issue (e.g. Closes #12). -->
 
 ## How it was tested
 

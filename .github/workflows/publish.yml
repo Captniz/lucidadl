@@ -1,0 +1,182 @@
+name: Publish release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release to resume, e.g. v1.4.1'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'Jude-A/lucidadl' && vars.RELEASE_AUTOMATION_ENABLED == 'true' && (github.event_name == 'release' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      saved: ${{ steps.release.outputs.saved }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate the published tag and inspect saved distributions
+        id: release
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          from scripts.release import version_from_tag
+          tag = os.environ['TAG']
+          version = version_from_tag(tag)
+          release = json.loads(subprocess.check_output(['gh', 'release', 'view', tag, '--json', 'isDraft,isPrerelease,assets'], text=True))
+          if release['isDraft'] or release['isPrerelease']:
+              raise SystemExit('Only published stable releases are supported')
+          subprocess.run(['git', 'merge-base', '--is-ancestor', f'refs/tags/{tag}', 'origin/main'], check=True)
+          expected = {f'lucidadl-{version}-py3-none-any.whl', f'lucidadl-{version}.tar.gz'}
+          assets = {a['name'] for a in release['assets']} & expected
+          if assets and assets != expected:
+              raise SystemExit('Incomplete saved distributions. Restore the missing file from the original Actions artifact; do not rebuild.')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'tag={tag}\nsaved={str(bool(assets)).lower()}\n')
+          PY
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+          path: source
+          persist-credentials: false
+      - name: Test the exact release source
+        working-directory: source
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          python ../scripts/release.py check --tag "$TAG"
+          python -m pip install . build twine
+          python selftest.py
+      - name: Build distributions once
+        if: steps.release.outputs.saved != 'true'
+        working-directory: source
+        run: |
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          python -m build --outdir ../dist
+      - name: Reuse the exact saved files on a retry
+        if: steps.release.outputs.saved == 'true'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$TAG" --pattern '*.whl' --pattern '*.tar.gz' --dir dist
+      - run: python -m twine check dist/*
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: distributions
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 90
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/lucidadl/
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: distributions
+          path: dist
+      - name: Save the original files before any PyPI upload
+        if: needs.build.outputs.saved != 'true'
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist/*
+      - name: Compare PyPI checksums and stage only missing files
+        id: pypi
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+        run: python scripts/release.py stage --tag "$TAG"
+      - name: Publish through PyPI Trusted Publishing
+        if: steps.pypi.outputs.pending == 'true'
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: pending-dist/
+      - name: Verify both published files
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+        run: python scripts/release.py verify --tag "$TAG"
+
+  nix:
+    concurrency:
+      group: nix-release-update
+      cancel-in-progress: false
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ steps.app.outputs.token }}
+      - name: Check whether Nix packaging has been merged
+        id: nix
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(gh release view --json tagName --jq .tagName)
+          if test "$TAG" != "$latest"; then
+            echo 'A newer GitHub release exists; skip this older Nix update.' >> "$GITHUB_STEP_SUMMARY"
+          elif test -f nix/default.nix; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Nix packaging is not on main yet; no update is needed.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        if: steps.nix.outputs.available == 'true'
+      - name: Update the released source and its hash
+        if: steps.nix.outputs.available == 'true'
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          hash=$(nix store prefetch-file --unpack --json "https://github.com/Jude-A/lucidadl/archive/refs/tags/$TAG.tar.gz" | python -c 'import json,sys; print(json.load(sys.stdin)["hash"])')
+          python scripts/release.py nix --tag "$TAG" --hash "$hash"
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        if: steps.nix.outputs.available == 'true'
+        with:
+          token: ${{ steps.app.outputs.token }}
+          branch: automation/nix-release
+          add-paths: nix/default.nix
+          commit-message: 'chore(nix): update published lucidadl version'
+          title: 'chore(nix): package ${{ needs.build.outputs.tag }}'
+          body: 'Update the Nix package to the release verified on GitHub and PyPI. The Nix CI must pass before merging.'

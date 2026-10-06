@@ -6,7 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- GrilledCheese downloads are available through the provider selection and download flow.
+
 ### Fixed
+- Amazon downloads retry the available regional servers when the requested region fails.
+- Qobuz and Amazon use Lucida's current provider regions.
+- A failed track-number metadata write preserves the original downloaded file.
 - Downloaded tracks carrying a composite embedded track number (`6/12`) now have it
   rewritten to the bare number (`6`) after placement, so players and devices show a
   clean position. Already-bare numbers are left untouched.
@@ -167,7 +173,8 @@ First public release.
 - **Fixed, configurable download directory** (`~/Downloads/music` by default;
   `lucida config --music`, or the `LUCIDADL_MUSIC` env var).
 
-[Unreleased]: https://github.com/Jude-A/lucidadl/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/Jude-A/lucidadl/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Jude-A/lucidadl/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/Jude-A/lucidadl/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/Jude-A/lucidadl/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Jude-A/lucidadl/compare/v1.1.0...v1.2.0

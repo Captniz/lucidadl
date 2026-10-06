@@ -1,0 +1,45 @@
+name: Mirror to Codeberg
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeberg-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: github.repository == 'Jude-A/lucidadl' && vars.CODEBERG_MIRROR_ENABLED == 'true' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Push main and version tags without rewriting Codeberg history
+        env:
+          CODEBERG_REPOSITORY: ${{ vars.CODEBERG_REPOSITORY }}
+          CODEBERG_SSH_KEY: ${{ secrets.CODEBERG_SSH_KEY }}
+        shell: bash
+        run: |
+          [[ "$CODEBERG_REPOSITORY" =~ ^git@codeberg\.org:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\.git$ ]] || { echo 'Set CODEBERG_REPOSITORY to the SSH URL.'; exit 1; }
+          test -n "$CODEBERG_SSH_KEY"
+          keydir=$(mktemp -d)
+          trap 'rm -rf "$keydir"' EXIT
+          chmod 700 "$keydir"
+          printf '%s\n' "$CODEBERG_SSH_KEY" > "$keydir/key"
+          # Pin the ED25519 fingerprint published by Codeberg over HTTPS:
+          # https://docs.codeberg.org/security/ssh-fingerprint/
+          ssh-keyscan -T 15 -t ed25519 codeberg.org > "$keydir/known_hosts"
+          fingerprint=$(ssh-keygen -lf "$keydir/known_hosts" | awk '{print $2}' | sort -u)
+          test "$fingerprint" = 'SHA256:mIlxA9k46MmM6qdJOdMnAQpzGxF4WIVVL+fj+wZbw0g'
+          chmod 600 "$keydir/key" "$keydir/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $keydir/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$keydir/known_hosts"
+          git push --atomic "$CODEBERG_REPOSITORY" HEAD:refs/heads/main 'refs/tags/v*:refs/tags/v*'
