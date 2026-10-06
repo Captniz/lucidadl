@@ -58,3 +58,33 @@ path, please test it manually and say so in the PR (e.g. `lucida setup` then
    when behavior or options change.
 3. Make sure `python selftest.py` passes.
 4. Open the PR with a clear description of what changed and how you tested it.
+
+## Release policy
+
+A validated user-facing code change on `main` requires a patch release, including a
+provider compatibility fix. Documentation-only status updates do not require a release.
+If several validated fixes have accumulated since the latest tag, publish them together
+in one patch release rather than creating one version per commit.
+
+Before publishing:
+
+1. Confirm the affected real-world flow works; provider fixes require one minimal live
+   download in a temporary folder, followed by cleanup.
+2. Complete a focused independent review and run `python selftest.py`.
+3. Increment the patch version consistently in `pyproject.toml`,
+   `lucidadl/__init__.py`, and the version assertion in `selftest.py`.
+4. Move the relevant `CHANGELOG.md` entries out of `Unreleased`, add the release date,
+   and update the comparison links.
+5. Build with `.venv\Scripts\python -m build` and validate with
+   `.venv\Scripts\python -m twine check dist/*`.
+6. Commit the release, create an annotated `vX.Y.Z` tag, and push the commit and tag to
+   GitHub and Codeberg.
+7. Upload with `.venv\Scripts\python -m twine upload dist/*`; Twine reads the PyPI token
+   from the local system keyring. Never print, copy into the repository, or include the
+   token in command arguments.
+8. Create the GitHub release from the matching changelog section. Release notes describe
+   user-visible changes only and must not contain internal validation commentary.
+9. Verify the new version on PyPI and GitHub before reporting success.
+
+PyPI versions are immutable. If publication is partial or ambiguous, inspect the remote
+state before retrying and never overwrite or silently reuse an already published version.
