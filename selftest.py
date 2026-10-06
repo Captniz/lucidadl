@@ -4,8 +4,7 @@ import asyncio as _aio
 
 from lucidadl import utils, matching
 from lucidadl.api import (
-    LucidaClient, normalize_service, default_country, search_country,
-    _account_country_for_url, _long, _apple_tracks_from_obj,
+    LucidaClient, normalize_service, default_country, _long, _apple_tracks_from_obj,
     _apple_playlist_from_scripts, is_apple_playlist_url, playlist_source,
     _spotify_playlist_from_html, _spotify_total_from_html,
     _deezer_playlist_from_obj, _tidal_playlist_from_html, _tidal_items_from_obj,
@@ -38,15 +37,10 @@ check("sanitize_filename strips bad chars", "/" not in utils.sanitize_filename("
 
 # services / country
 check("normalize amazon_music", normalize_service("amazon_music") == "amazon")
-check("default_country qobuz=US", default_country("qobuz") == "US")
+check("default_country qobuz=NL", default_country("qobuz") == "NL")
 check("default_country amazon=''", default_country("amazon") == "")
 check("download country for grilledcheese is auto",
       default_country("grilledcheese") == "")
-check("search country for grilledcheese is XX",
-      search_country("grilledcheese") == "XX")
-check("XX becomes auto only for a grilledcheese item URL",
-      _account_country_for_url("https://lucida.to/i/gc1_token", "XX") == ""
-      and _account_country_for_url("https://play.qobuz.com/track/1", "XX") == "XX")
 check("default_country other=US", default_country("tidal") == "US")
 check("formats", DOWNSCALE_CHOICES[0] == "original" and "flac" in DOWNSCALE_CHOICES)
 check("Apple URL validation accepts playlists only",
