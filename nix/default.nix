@@ -28,6 +28,7 @@ python3Packages.buildPythonApplication rec {
     playwright
     click
     httpx
+    h2
     pyjson5
     imageio-ffmpeg
     mutagen
