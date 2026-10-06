@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import tempfile
 import zipfile
 from typing import Dict, List, Optional
 
@@ -59,6 +60,57 @@ def read_tags(path: str) -> Dict[str, str]:
         return {}
 
 
+# '6/12' style composite track numbers (lucida copies the source service's format);
+# the numerator is the real position of this file.
+_TRACKNUMBER_FRACTION = re.compile(r"^(\d+)\s*/\s*\d+$")
+
+
+def _bare_track_number(value: str) -> Optional[str]:
+    """The bare number from a 'N/M' composite tracknumber, or None when `value` isn't
+    one (already bare, empty, or not a number pair)."""
+    m = _TRACKNUMBER_FRACTION.match((value or "").strip())
+    return m.group(1) if m else None
+
+
+def fix_track_number(path: str) -> None:
+    """Best-effort rewrite of a '6/12' composite embedded tracknumber to the bare '6'.
+    Music players and car/watch units display the raw tag, and '6/12' clutters sorting
+    and watch lists. Only fraction-form values are rewritten, so already-correct tags
+    are never touched. Save to a temporary copy in the same directory, then replace
+    the original only after saving succeeds. Errors before replacement leave the
+    original contents intact and are silent because the fix is cosmetic."""
+    if _mutagen is None:
+        return
+    tmp = None
+    try:
+        original = _long(os.path.abspath(path))
+        f = _mutagen.File(original, easy=True)
+        if not f:
+            return
+        current = f.get("tracknumber")
+        if isinstance(current, list):
+            current = current[0] if current else ""
+        bare = _bare_track_number(str(current or ""))
+        if bare:
+            # Close the descriptor before reopening the copy (required on Windows).
+            fd, tmp = tempfile.mkstemp(prefix=".lucidadl-tracknumber-",
+                                       suffix=os.path.splitext(original)[1],
+                                       dir=os.path.dirname(original))
+            os.close(fd)
+            shutil.copy2(original, tmp)
+            f["tracknumber"] = bare
+            f.save(tmp)
+            os.replace(tmp, original)
+    except Exception:
+        pass
+    finally:
+        if tmp is not None:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
 def album_dir(music_root: str, tags: Dict[str, str], meta: Dict[str, str] = None) -> str:
     """<music_root>/<Artist>/<Album>/. Embedded `tags` win; API-derived `meta` only
     fills a BLANK folder-artist or folder-album (so a file that already organizes
@@ -109,7 +161,8 @@ def place_file(path: str, music_root: str, collection: str = None,
     `collection` (playlist name) is given, into <music_root>/Playlists/<collection>/.
     The artist prefix is stripped from the filename; playlist tracks are prefixed with
     `track_no` so they keep the playlist order instead of sorting alphabetically.
-    `meta` (API artist/album) is the fallback used when embedded tags are missing."""
+    `meta` (API artist/album) is the fallback used when embedded tags are missing.
+    A '6/12' style embedded tracknumber is rewritten to '6' (best-effort)."""
     title, ext = _title_and_ext(os.path.basename(path), meta, prefer_meta_title)
     if collection:
         dest_dir = os.path.join(music_root, PLAYLISTS_DIR, utils.sanitize(collection))
@@ -117,7 +170,9 @@ def place_file(path: str, music_root: str, collection: str = None,
     else:
         dest_dir = album_dir(os.path.join(music_root, ARTISTS_DIR), read_tags(path), meta)
         stem = title
-    return _move_into(path, dest_dir, utils.sanitize_filename(stem + ext))
+    final = _move_into(path, dest_dir, utils.sanitize_filename(stem + ext))
+    fix_track_number(final)
+    return final
 
 
 def _m3u_title(filename: str) -> str:
