@@ -57,20 +57,12 @@ path, please test it manually and say so in the PR (e.g. `lucida setup` then
 2. Keep the change focused; update `README.md` / `CHANGELOG.md` (under `## [Unreleased]`)
    when behavior or options change. Keep these notes limited to user-visible changes.
 3. Make sure `python selftest.py` passes.
-4. Open the PR with a clear description of what changed and how you tested it.
+4. Describe the purpose, resulting behavior and relevant test results in the PR.
+   Keep public descriptions focused on the project and omit private information.
 5. Use `fix:`, `feat:`, `perf:` or `revert:` for package changes; use `docs:`, `ci:`,
    `test:`, `build:` or `chore:` for changes that do not need a Python release.
    Squash-merge using that title so Release Please can classify the change.
    Direct commits to `main` must follow the same convention.
-
-### Public writing
-
-Keep PR descriptions, comments and release notes focused on the project and useful to
-readers. Do not include personal circumstances, private conversation context or details
-of a contributor's tools unless explicitly requested and relevant to the change.
-Write naturally, explain the purpose and resulting behavior, and summarize validation.
-Include technical details only when they help review the change. State any untested
-behavior or required setup precisely. Before posting, check relevance, tone and accuracy.
 
 ## Release policy
 
@@ -79,20 +71,16 @@ provider compatibility fix. Group accumulated changes into one release. Document
 status, CI, tests and Nix packaging changes alone do not require a Python release.
 
 GitHub Actions prepares and publishes releases using PyPI Trusted Publishing.
-See [release setup and recovery](docs/releasing.md).
+See [publishing and recovery](docs/releasing.md).
 
 1. Before merging a provider fix, confirm one minimal live download in a temporary
    folder, clean it up, and record the result in the PR. Complete a focused independent
    review. Offline CI does not establish that a live provider works.
-2. Release Please maintains one release PR, updating `pyproject.toml`,
-   `lucidadl/__init__.py`, the version assertion in `selftest.py`, its version manifest,
-   and `CHANGELOG.md`. The default bump is patch; a deliberate minor/major change needs
-   an explicit `Release-As: X.Y.Z` commit footer and maintainer review.
-3. Review the release PR's notes and passing tests, then merge it. This is the publication
-   approval: Actions creates the tag and GitHub Release, builds and checks the package,
-   publishes through PyPI Trusted Publishing, and verifies the remote file checksums.
-4. Nix follows a **published** release via a separate version/hash PR and the Nix CI.
-   The Codeberg mirror pushes `main` and version tags without force-pushing.
+2. Release Please prepares a grouped release PR with synchronized versions and changelog
+   entries. The default bump is patch; a deliberate minor/major change needs an explicit
+   `Release-As: X.Y.Z` commit footer and maintainer review.
+3. Review the release PR's notes and passing tests before merging. Merging authorizes
+   publication through the release workflows.
 
 Maintain a complete set of user-facing notes under `Unreleased` while fixes accumulate.
 If that section contains notes, they replace the generated commit-title notes in the
