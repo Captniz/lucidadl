@@ -1023,7 +1023,7 @@ _help = _runner.invoke(_cli.cli, ["--help"])
 check("cli: developer debug command is hidden", "  debug " not in _help.output)
 _version = _runner.invoke(_cli.cli, ["--version"])
 check("cli: source version matches release metadata",
-      _version.exit_code == 0 and "1.4.0" in _version.output)
+      _version.exit_code == 0 and "1.4.0" in _version.output)  # x-release-please-version
 
 print()
 if fails:
