@@ -336,6 +336,7 @@ check("bare track number: not a pair -> None",
 
 if _org.mutagen_available():
     from mutagen import File as _mFile
+    from unittest.mock import patch as _tag_patch
     _d6 = tempfile.mkdtemp(prefix="lucidadl_trackno_")
 
     def _tagged_flac(name, tracknumber):
@@ -358,6 +359,59 @@ if _org.mutagen_available():
                            meta={"albumartist": "AA", "album": "BB"})
     check("tracknumber fix: already-bare value left untouched",
           list(_mFile(_fp2, easy=True).get("tracknumber") or []) == ["3"])
+
+    # A real partial write must only damage the disposable copy, never the download.
+    _fp3 = _tagged_flac("partial.flac", "6/12")
+    with open(_fp3, "rb") as _fh:
+        _original = _fh.read()
+    _entries_before = set(_os.listdir(_d6))
+
+    def _partial_tag_save(self, filename=None, **kwargs):
+        with open(filename or self.filename, "r+b") as fh:
+            fh.write(b"broken")
+        raise OSError("simulated partial metadata write")
+
+    with _tag_patch.object(type(_mFile(_fp3, easy=True)), "save",
+                           autospec=True, side_effect=_partial_tag_save) as _save:
+        _org.fix_track_number(_fp3)
+    check("tracknumber fix: partial write failure was exercised", _save.call_count == 1)
+    with open(_fp3, "rb") as _fh:
+        check("tracknumber fix: partial write preserves original bytes",
+              _fh.read() == _original)
+    check("tracknumber fix: partial write leaves no temporary file",
+          set(_os.listdir(_d6)) == _entries_before)
+
+    _fp4 = _tagged_flac("replace.flac", "6/12")
+    with open(_fp4, "rb") as _fh:
+        _original = _fh.read()
+    _entries_before = set(_os.listdir(_d6))
+    with _tag_patch.object(_org.os, "replace", side_effect=OSError("file locked")) as _replace:
+        _org.fix_track_number(_fp4)
+    check("tracknumber fix: replacement failure was exercised", _replace.call_count == 1)
+    with open(_fp4, "rb") as _fh:
+        check("tracknumber fix: replacement failure preserves original bytes",
+              _fh.read() == _original)
+    check("tracknumber fix: replacement failure leaves no temporary file",
+          set(_os.listdir(_d6)) == _entries_before)
+
+    def _partial_tag_copy(src, dst):
+        with open(dst, "wb") as fh:
+            fh.write(b"incomplete copy")
+        raise OSError("simulated disk full")
+
+    with _tag_patch.object(_org.shutil, "copy2", side_effect=_partial_tag_copy) as _copy:
+        _org.fix_track_number(_fp4)
+    check("tracknumber fix: copy failure was exercised", _copy.call_count == 1)
+    with open(_fp4, "rb") as _fh:
+        check("tracknumber fix: copy failure preserves original bytes",
+              _fh.read() == _original)
+    check("tracknumber fix: copy failure leaves no temporary file",
+          set(_os.listdir(_d6)) == _entries_before)
+
+    _org.fix_track_number(_fp4)
+    check("tracknumber fix: successful retry saves the bare number and cleans up",
+          list(_mFile(_fp4, easy=True).get("tracknumber") or []) == ["6"]
+          and set(_os.listdir(_d6)) == _entries_before)
     _sh.rmtree(_d6, ignore_errors=True)
 
 # playlist .m3u8 sidecar: lists audio in track order, bare filenames, with EXTINF titles

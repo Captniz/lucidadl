@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import tempfile
 import zipfile
 from typing import Dict, List, Optional
 
@@ -75,12 +76,15 @@ def fix_track_number(path: str) -> None:
     """Best-effort rewrite of a '6/12' composite embedded tracknumber to the bare '6'.
     Music players and car/watch units display the raw tag, and '6/12' clutters sorting
     and watch lists. Only fraction-form values are rewritten, so already-correct tags
-    are never touched. Failures are silent on purpose: the fix is cosmetic, and a
-    failure leaves the file exactly as it was before."""
+    are never touched. Save to a temporary copy in the same directory, then replace
+    the original only after saving succeeds. Errors before replacement leave the
+    original contents intact and are silent because the fix is cosmetic."""
     if _mutagen is None:
         return
+    tmp = None
     try:
-        f = _mutagen.File(_long(path), easy=True)
+        original = _long(os.path.abspath(path))
+        f = _mutagen.File(original, easy=True)
         if not f:
             return
         current = f.get("tracknumber")
@@ -88,10 +92,23 @@ def fix_track_number(path: str) -> None:
             current = current[0] if current else ""
         bare = _bare_track_number(str(current or ""))
         if bare:
+            # Close the descriptor before reopening the copy (required on Windows).
+            fd, tmp = tempfile.mkstemp(prefix=".lucidadl-tracknumber-",
+                                       suffix=os.path.splitext(original)[1],
+                                       dir=os.path.dirname(original))
+            os.close(fd)
+            shutil.copy2(original, tmp)
             f["tracknumber"] = bare
-            f.save()
+            f.save(tmp)
+            os.replace(tmp, original)
     except Exception:
         pass
+    finally:
+        if tmp is not None:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
 
 def album_dir(music_root: str, tags: Dict[str, str], meta: Dict[str, str] = None) -> str:
