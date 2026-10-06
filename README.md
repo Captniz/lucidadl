@@ -160,8 +160,6 @@ account. Deezer, Amazon Music, and Qobuz are read directly; short Spotify and TI
 lists use their fast public players. Apple Music, YouTube, SoundCloud, and longer
 Spotify/TIDAL lists automatically use a headless browser to load every public position.
 The import stops with a clear error instead of accepting a known partial list.
-Cross-service playlist translation and account authorization remain the responsibility
-of a separate companion project.
 
 ## Interactive menu
 
@@ -302,8 +300,7 @@ Release changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
 lucidadl takes inspiration from
 [lucida-flow](https://github.com/ryanlong1004/lucida-flow) and
-[lucida-downloader](https://github.com/jelni/lucida-downloader). The project started as
-a small, AI-assisted personal tool and remains intentionally focused on that scale.
+[lucida-downloader](https://github.com/jelni/lucida-downloader).
 
 ## License
 

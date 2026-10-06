@@ -1,7 +1,6 @@
 ## What & why
 
-<!-- Explain the purpose and resulting behavior in plain language. Keep this focused on
-     the project; omit personal circumstances and private conversation context.
+<!-- Explain the purpose and resulting behavior. Include only project-relevant information.
      Link any related issue (e.g. Closes #12). -->
 
 ## How it was tested
