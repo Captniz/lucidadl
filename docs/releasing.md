@@ -48,7 +48,7 @@ In the **existing** PyPI project, open
 
 This is an existing-project publisher, not a pending publisher for a new project.
 The workflow exchanges GitHub's OIDC identity for a short-lived PyPI credential.
-There is no `PYPI_TOKEN` secret to create or copy from Windows.
+No `PYPI_TOKEN` secret is needed.
 
 ### 3. Codeberg mirror
 
@@ -78,7 +78,7 @@ commits before retrying; never solve it by adding `--force`.
 
 ### 4. Activate and make the first release
 
-1. Disable the old local release/publishing automation so there is only one publisher.
+1. Disable any existing publishing automation to avoid duplicate releases.
 2. Merge the automation PR with passing CI.
 3. After configuring the App and PyPI publisher, set repository variable
    `RELEASE_AUTOMATION_ENABLED` to **`true`**.
@@ -91,8 +91,6 @@ commits before retrying; never solve it by adding `--force`.
    after enabling it if the relevant push happened before activation.
 
 Thereafter, normal merges update one grouped release PR. Merging that PR publishes it.
-No weekly job and no AI provider are involved in publication. Live service diagnosis
-and coding remain separate maintenance work; these workflows do not make autonomous fixes.
 
 ## Recovery
 

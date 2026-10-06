@@ -63,14 +63,23 @@ path, please test it manually and say so in the PR (e.g. `lucida setup` then
    Squash-merge using that title so Release Please can classify the change.
    Direct commits to `main` must follow the same convention.
 
+### Public writing
+
+Keep PR descriptions, comments and release notes focused on the project and useful to
+readers. Do not include personal circumstances, private conversation context or details
+of a contributor's tools unless explicitly requested and relevant to the change.
+Write naturally, explain the purpose and resulting behavior, and summarize validation.
+Include technical details only when they help review the change. State any untested
+behavior or required setup precisely. Before posting, check relevance, tone and accuracy.
+
 ## Release policy
 
 A validated user-facing code change on `main` requires a patch release, including a
 provider compatibility fix. Group accumulated changes into one release. Documentation,
 status, CI, tests and Nix packaging changes alone do not require a Python release.
 
-GitHub Actions owns release preparation and publication; no local AI session, scheduler,
-Windows keyring or PyPI API token is required. See [release setup and recovery](docs/releasing.md).
+GitHub Actions prepares and publishes releases using PyPI Trusted Publishing.
+See [release setup and recovery](docs/releasing.md).
 
 1. Before merging a provider fix, confirm one minimal live download in a temporary
    folder, clean it up, and record the result in the PR. Complete a focused independent
