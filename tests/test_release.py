@@ -48,6 +48,39 @@ class ReleaseTests(unittest.TestCase):
                     with self.assertRaises(HTTPError):
                         release.pypi_files('1.4.1')
 
+    @patch('scripts.release.time.sleep')
+    def test_verification_waits_for_both_uploaded_files(self, sleep):
+        wheel = self.root / 'lucidadl-1.4.1-py3-none-any.whl'
+        wheel.write_bytes(b'wheel')
+        remote_wheel = {'filename': wheel.name, 'digests': {
+            'sha256': hashlib.sha256(wheel.read_bytes()).hexdigest()}}
+        files = {**self.files, wheel.name: wheel}
+        with patch('scripts.release.pypi_files', side_effect=[
+                [], [self.remote], [self.remote, remote_wheel]]) as fetch:
+            release.verify_publication('1.4.1', files)
+        self.assertEqual(fetch.call_count, 3)
+        self.assertEqual(sleep.call_count, 2)
+
+    @patch('scripts.release.time.sleep')
+    def test_verification_eventually_fails_for_missing_files(self, sleep):
+        with patch('scripts.release.pypi_files', return_value=[]) as fetch:
+            with self.assertRaisesRegex(ValueError, 'publication incomplete'):
+                release.verify_publication('1.4.1', self.files)
+        self.assertEqual(fetch.call_count, 6)
+        self.assertEqual(sleep.call_count, 5)
+
+    @patch('scripts.release.time.sleep')
+    def test_verification_never_retries_conflicts_or_api_errors(self, sleep):
+        bad = {**self.remote, 'digests': {'sha256': 'wrong'}}
+        with patch('scripts.release.pypi_files', return_value=[bad]) as fetch:
+            with self.assertRaisesRegex(ValueError, 'differs'):
+                release.verify_publication('1.4.1', self.files)
+            fetch.assert_called_once()
+        with patch('scripts.release.pypi_files', side_effect=HTTPError('url', 403, '', {}, None)):
+            with self.assertRaises(HTTPError):
+                release.verify_publication('1.4.1', self.files)
+        sleep.assert_not_called()
+
     def test_changelog_carries_curated_notes_and_is_idempotent(self):
         content = ('# Changelog\n\n## [1.4.1](compare) (2026-10-07)\n\n### Fixed\n* generated\n\n'
                    '## [Unreleased]\n\n### Fixed\n- Preserve downloads.\n\n'

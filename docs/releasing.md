@@ -43,8 +43,9 @@ artifact from the original build run and restore only the missing file to the sa
 GitHub Release. Artifacts are retained for 90 days. If the original files are unavailable,
 investigate before proceeding; do not rebuild a substitute for an existing publication.
 
-A transient PyPI indexing delay may fail final verification. Recheck the same tag
-rather than creating another version.
+Final verification checks up to six times, ten seconds apart, while uploaded files
+appear in PyPI's JSON API. If they remain missing, recheck the same tag rather than
+creating another version. Conflicting files and API errors stop verification immediately.
 
 If only the Nix update failed, rerun that job. It updates packaging for the published
 release without creating a new Python version. If packaging was added after publication,
