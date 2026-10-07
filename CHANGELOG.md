@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.1](https://github.com/Jude-A/lucidadl/compare/v1.4.0...v1.4.1) (2026-10-07)
+
 ### Added
 - GrilledCheese downloads are available through the provider selection and download flow.
 
@@ -173,7 +175,7 @@ First public release.
 - **Fixed, configurable download directory** (`~/Downloads/music` by default;
   `lucida config --music`, or the `LUCIDADL_MUSIC` env var).
 
-[Unreleased]: https://github.com/Jude-A/lucidadl/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/Jude-A/lucidadl/compare/v1.4.1...HEAD
 [1.4.0]: https://github.com/Jude-A/lucidadl/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/Jude-A/lucidadl/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/Jude-A/lucidadl/compare/v1.2.0...v1.3.0
