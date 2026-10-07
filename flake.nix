@@ -46,6 +46,7 @@
         };
 
       # Home Manager module exported by this flake.
+      homeModule = import ./nix/home-manager.nix;
       homeManagerModules.default = import ./nix/home-manager.nix;
 
       # `nix run` entrypoint -> the lucidadl executable from the default package.
