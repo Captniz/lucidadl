@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import time
 import urllib.error
 import urllib.request
 
@@ -64,6 +65,20 @@ def missing_distributions(files, remote):
             raise ValueError(f'PyPI file differs or is yanked: {name}; inspect before retrying')
         missing.discard(name)
     return sorted(missing)
+
+
+def verify_publication(version, files):
+    # PyPI's JSON API can lag behind a successful upload. Only missing files
+    # are retried; conflicting files and network/API errors still fail immediately.
+    for attempt in range(6):
+        missing = missing_distributions(files, pypi_files(version))
+        if not missing:
+            print(f'PyPI {version}: both distributions verified by SHA-256')
+            return
+        if attempt < 5:
+            print(f'Waiting for PyPI to list {missing}; checking again in 10 seconds', flush=True)
+            time.sleep(10)
+    raise ValueError(f'PyPI publication incomplete: {missing}; retry verification later')
 
 
 def finalize_changelog(content, version):
@@ -134,12 +149,10 @@ def main():
         update_nix(version, args.hash)
     else:
         files = distributions(version)
-        missing = missing_distributions(files, pypi_files(version))
         if args.command == 'verify':
-            if missing:
-                raise ValueError(f'PyPI publication incomplete: {missing}; retry verification later')
-            print(f'PyPI {version}: both distributions verified by SHA-256')
+            verify_publication(version, files)
         else:
+            missing = missing_distributions(files, pypi_files(version))
             destination = Path('pending-dist')
             destination.mkdir(exist_ok=False)
             for name in missing:
