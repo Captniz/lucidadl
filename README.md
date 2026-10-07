@@ -74,59 +74,35 @@ lucida setup
 Installing the package creates both `lucida` and `lucidadl`. If another application
 already owns the `lucida` command, use the `lucidadl` alias for every example below.
 
-## Installation trough Nix and Home Manager
-Currently, two architectures are supported for nix: `x86_64-linux` and `aarch64-linux`.
+## Nix installation
 
-The flake supports several installation and usage methods:
-- [Direct package use](#run-or-build-it-directly)
-- [Nixos Package Installation](#nixos-direct-package-installation) : **Recommended for system-wide install**
-- [Nixos Module](#nixos-module)
-- [Home Manager Package Installation](#home-manager-direct-package-installation)
-- [Home-Manger Module](#home-manager-module)  : **Recommended for single-user install**
-- [Overlay](#overlay) 
+The flake supports `x86_64-linux` and `aarch64-linux`.
 
-But first, **you have to import the flake** :  
-
-Add lucidadl to the `inputs` of the flake that manages your system or home
-configuration:
+Add lucidadl to the inputs of your NixOS or Home Manager flake:
 
 ```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-    lucidadl.url = "github:Captniz/lucidadl";
-  };
-}
+inputs.lucidadl.url = "github:Captniz/lucidadl";
 ```
 
+To use the same nixpkgs revision as your system, add
+`inputs.lucidadl.inputs.nixpkgs.follows = "nixpkgs";` to your inputs.
+Update it with `nix flake update lucidadl`.
 
-It is recommended to use the same `nixpkgs` revision as your system. This
-reuses the system's `nixpkgs` input instead of fetching a separate revision and
-helps keep packages consistent. However, if lucidadl has only been tested
-against a different `nixpkgs` revision, following your system's revision could
-occasionally cause dependency incompatibilities.
+### Run or build directly
+
+For one-off use, without adding lucidadl to a system or home configuration:
+
+```sh
+nix run github:Captniz/lucidadl
+nix build github:Captniz/lucidadl
+```
+
+### Install the package directly
+
+Add the package to `environment.systemPackages` on NixOS:
 
 ```nix
-    lucidadl = {
-        url = "github:Captniz/lucidadl";
-        inputs.nixpkgs.follows = "nixpkgs";
-    }
-```
-
-Lucidadl can updated with:
-
-```bash
-nix flake update lucidadl
-```
-
-### Nixos direct package installation
-
-You can install lucidadl directly in your NixOS system without importing the
-NixOS module or applying the overlay. Add the package output to
-`environment.systemPackages` in your system module:
-
-```nix
-{ inputs, systemSettings, ... }:
+{ inputs, pkgs, ... }:
 {
   environment.systemPackages = [
     inputs.lucidadl.packages.${pkgs.stdenv.hostPlatform.system}.default
@@ -134,113 +110,18 @@ NixOS module or applying the overlay. Add the package output to
 }
 ```
 
-Rebuild the system from the flake directory:
+For Home Manager, add the same package to `home.packages` instead.
 
-```bash
-sudo nixos-rebuild switch --flake .#my-host
-```
+### Use the NixOS module
 
-After the rebuild, run the installed command with:
+Import `inputs.lucidadl.nixosModules.default` in your `nixosSystem` modules.
+It installs lucidadl system-wide and configures the overlay.
 
-```bash
-lucidadl
-```
+### Use the Home Manager module
 
-This direct package method does not use `inputs.lucidadl.nixosModules.default`,
-`inputs.lucidadl.homeModule`, or `inputs.lucidadl.overlays.default`.
-
-### NixOS module
-
-The NixOS module installs lucidadl system-wide and registers the overlay automatically.
-Import it in the `modules` list of your `nixosSystem`:
+Import `inputs.lucidadl.homeManagerModules.default` and enable the program:
 
 ```nix
-{
-  inputs.lucidadl.url = "github:Captniz/lucidadl";
-
-  outputs = { nixpkgs, lucidadl, ... }: {
-    nixosConfigurations.my-host = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        ./configuration.nix
-        lucidadl.nixosModules.default
-      ];
-    };
-  };
-}
-```
-
-After rebuilding, the `lucidadl` command is available system-wide:
-
-```bash
-sudo nixos-rebuild switch --flake .#my-host
-lucidadl
-```
-
-The module is equivalent to adding `lucidadl.overlays.default` and
-`pkgs.lucidadl` to the system configuration. You do not need to add the overlay
-separately when using `lucidadl.nixosModules.default`.
-
-### Home Manager direct package installation
-
-As with the [NixOS direct package installation](#nixos-direct-package-installation),
-you can install lucidadl directly through Home Manager by adding the package to
-`home.packages`. This does not enable the lucidadl-specific
-`programs.lucidadl` options; use the [Home Manager module](#home-manager-module)
-if you want those options.
-```nix
-{ inputs, pkgs, ... }:
-{
-  home.packages = [
-    inputs.lucidadl.packages.${pkgs.stdenv.hostPlatform.system}.default
-  ];
-}
-```
-
-For standalone Home Manager, rebuild from the flake directory:
-
-```sh
-home-manager switch --flake .#my-user
-```
-
-For Home Manager integrated with NixOS, use:
-
-```sh
-sudo nixos-rebuild switch --flake .#my-host
-```
-After the rebuild, run:
-```sh
-lucidadl
-```
-
-### Home Manager module
-
-The Home Manager module builds the package and installs lucidadl into the user's profile.
-
-For standalone Home Manager, pass `inputs` (_and any system settings used by the
-flake_) through `extraSpecialArgs`, then import the module in `home.nix`:
-
-```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-    home-manager.url = "github:nix-community/home-manager";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    lucidadl.url = "github:Captniz/lucidadl";
-  };
-
-  outputs = { home-manager, nixpkgs, ... }@inputs: {
-    homeConfigurations.my-user = home-manager.lib.homeManagerConfiguration {
-      pkgs = import nixpkgs { system = "x86_64-linux"; };
-      extraSpecialArgs = { inherit inputs; };
-      modules = [ ./home.nix ];
-    };
-  };
-}
-```
-
-```nix
-# home.nix
 { inputs, ... }:
 {
   imports = [ inputs.lucidadl.homeManagerModules.default ];
@@ -248,67 +129,10 @@ flake_) through `extraSpecialArgs`, then import the module in `home.nix`:
 }
 ```
 
-The shorter alias `inputs.lucidadl.homeModule` is also available:
+### Use the overlay
 
-```nix
-imports = [ inputs.lucidadl.homeModule ];
-```
-
-For NixOS-integrated Home Manager, add
-`home-manager.nixosModules.home-manager` to the NixOS modules and import the
-lucidadl module in the user's Home Manager module:
-
-```nix
-{
-  home-manager.users.my-user = {
-    imports = [ inputs.lucidadl.homeManagerModules.default ];
-    programs.lucidadl.enable = true;
-  };
-}
-```
-
-The module also accepts an explicit package when you need to pin or replace the
-default:
-
-```nix
-{
-  programs.lucidadl = {
-    enable = true;
-    package = inputs.lucidadl.packages.${pkgs.stdenv.hostPlatform.system}.default;
-  };
-}
-```
-
-
-### Run or build it directly
-
-No module or overlay is required for **one-off** use:
-
-```bash
-nix run github:Captniz/lucidadl
-nix build github:Captniz/lucidadl
-```
-
-
-### Overlay
-
-The optional overlay adds lucidadl to the nixpkgs package set as `pkgs.lucidadl`:
-
-
-```nix
-{
-  nixpkgs.overlays = [ inputs.lucidadl.overlays.default ];
-  environment.systemPackages = [ pkgs.lucidadl ];
-}
-```
-
-It provides a shorter alternative to the direct package references used in the
-[NixOS direct package installation](#nixos-direct-package-installation) and
-[Home Manager direct package installation](#home-manager-direct-package-installation)
-sections. The overlay is therefore optional.
-
-Applying the overlay is not needed for `nix run`, direct package references, the
-NixOS module, or the Home Manager module.
+Add `inputs.lucidadl.overlays.default` to `nixpkgs.overlays`, then install
+`pkgs.lucidadl` through `environment.systemPackages` or `home.packages`.
 
 ## Three ways to download
 
