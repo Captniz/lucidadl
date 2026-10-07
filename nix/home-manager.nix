@@ -9,8 +9,8 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = pkgs.lucidadl;
-      defaultText = lib.literalExpression "pkgs.lucidadl";
+      default = pkgs.callPackage ./default.nix { };
+      defaultText = lib.literalExpression "pkgs.callPackage ./default.nix { }";
       description = "The lucidadl package to install.";
     };
   };
