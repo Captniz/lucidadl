@@ -1,0 +1,27 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "09f8713e2ba2d24d5d79b3fd5d9d4927a11338f7",
+  "packages": {
+    ".": {
+      "release-type": "python",
+      "package-name": "lucidadl",
+      "include-component-in-tag": false,
+      "versioning": "always-bump-patch",
+      "extra-files": ["selftest.py"],
+      "exclude-paths": [".github", "docs", "nix", "scripts", "tests"],
+      "changelog-sections": [
+        {"type": "feat", "section": "Added"},
+        {"type": "fix", "section": "Fixed"},
+        {"type": "perf", "section": "Performance"},
+        {"type": "revert", "section": "Reverted"},
+        {"type": "docs", "hidden": true},
+        {"type": "chore", "hidden": true},
+        {"type": "ci", "hidden": true},
+        {"type": "test", "hidden": true},
+        {"type": "build", "hidden": true},
+        {"type": "refactor", "hidden": true},
+        {"type": "style", "hidden": true}
+      ]
+    }
+  }
+}

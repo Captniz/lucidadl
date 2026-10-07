@@ -1,6 +1,7 @@
 ## What & why
 
-<!-- What does this change, and why? Link any related issue (e.g. Closes #12). -->
+<!-- Explain the purpose and resulting behavior. Include only project-relevant information.
+     Link any related issue (e.g. Closes #12). -->
 
 ## How it was tested
 

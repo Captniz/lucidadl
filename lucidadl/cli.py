@@ -202,7 +202,7 @@ def _exit_if_failed(result: RunResult) -> None:
 def _service_opts(f):
     f = click.option("-s", "--service", default="qobuz",
                      help="Source service (qobuz by default; amazon, grilledcheese).")(f)
-    f = click.option("--country", default=None, help="Country code (def: US for qobuz).")(f)
+    f = click.option("--country", default=None, help="Country code (def: NL for qobuz).")(f)
     f = click.option("-F", "--format", "downscale", default="original",
                      type=click.Choice(DOWNSCALE_CHOICES),
                      help="Format requested from lucida (server-side conversion, no bitrate "
@@ -1109,7 +1109,7 @@ async def _debug(query, service, country, item, headless):
 @cli.command("debug", hidden=True)
 @click.argument("query", nargs=-1)
 @click.option("-s", "--service", default="qobuz", help="Service to diagnose (def: qobuz).")
-@click.option("--country", default=None, help="Country code (def: US for qobuz).")
+@click.option("--country", default=None, help="Country code (def: NL for qobuz).")
 @click.option("--item", default=None, help="Load this item URL instead of a search.")
 @click.option("--headless", is_flag=True, help="(dev) force headless, normally blocked by CF.")
 def debug_cmd(query, service, country, item, headless):

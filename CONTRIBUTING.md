@@ -55,6 +55,37 @@ path, please test it manually and say so in the PR (e.g. `lucida setup` then
 
 1. Branch off `main`.
 2. Keep the change focused; update `README.md` / `CHANGELOG.md` (under `## [Unreleased]`)
-   when behavior or options change.
+   when behavior or options change. Keep these notes limited to user-visible changes.
 3. Make sure `python selftest.py` passes.
-4. Open the PR with a clear description of what changed and how you tested it.
+4. Describe the purpose, resulting behavior and relevant test results in the PR.
+   Keep public descriptions focused on the project and omit private information.
+5. Use `fix:`, `feat:`, `perf:` or `revert:` for package changes; use `docs:`, `ci:`,
+   `test:`, `build:` or `chore:` for changes that do not need a Python release.
+   Squash-merge using that title so Release Please can classify the change.
+   Direct commits to `main` must follow the same convention.
+
+## Release policy
+
+A validated user-facing code change on `main` requires a patch release, including a
+provider compatibility fix. Group accumulated changes into one release. Documentation,
+status, CI, tests and Nix packaging changes alone do not require a Python release.
+
+GitHub Actions prepares and publishes releases using PyPI Trusted Publishing.
+See [publishing and recovery](docs/releasing.md).
+
+1. Before merging a provider fix, confirm one minimal live download in a temporary
+   folder, clean it up, and record the result in the PR. Complete a focused independent
+   review. Offline CI does not establish that a live provider works.
+2. Release Please prepares a grouped release PR with synchronized versions and changelog
+   entries. The default bump is patch; a deliberate minor/major change needs an explicit
+   `Release-As: X.Y.Z` commit footer and maintainer review.
+3. Review the release PR's notes and passing tests before merging. Merging authorizes
+   publication through the release workflows.
+
+Maintain a complete set of user-facing notes under `Unreleased` while fixes accumulate.
+If that section contains notes, they replace the generated commit-title notes in the
+release PR and GitHub Release. Otherwise, Release Please's generated notes are used.
+
+PyPI versions are immutable. A partial or ambiguous publication must be inspected and
+resumed using the existing tag and original distribution files. Never overwrite a tag,
+replace existing release assets, or silently reuse a published version for different code.

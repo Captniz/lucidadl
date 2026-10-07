@@ -1,0 +1,52 @@
+name: Prepare release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'Jude-A/lucidadl' && vars.RELEASE_AUTOMATION_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ steps.app.outputs.token }}
+          target-branch: main
+      - uses: actions/checkout@v4
+        if: steps.release.outputs.pr != ''
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
+          token: ${{ steps.app.outputs.token }}
+      - name: Carry curated notes into the release PR
+        if: steps.release.outputs.pr != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          RELEASE_PR: ${{ fromJSON(steps.release.outputs.pr || '{}').number }}
+        run: |
+          python scripts/release.py finalize
+          git config user.name 'lucidadl release bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add CHANGELOG.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore: finalize release notes'
+            git push
+          fi
+          gh pr edit "$RELEASE_PR" --body-file release-pr-body.txt

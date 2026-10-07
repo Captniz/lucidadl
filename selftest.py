@@ -4,8 +4,7 @@ import asyncio as _aio
 
 from lucidadl import utils, matching
 from lucidadl.api import (
-    LucidaClient, normalize_service, default_country, search_country,
-    _account_country_for_url, _long, _apple_tracks_from_obj,
+    LucidaClient, normalize_service, default_country, _long, _apple_tracks_from_obj,
     _apple_playlist_from_scripts, is_apple_playlist_url, playlist_source,
     _spotify_playlist_from_html, _spotify_total_from_html,
     _deezer_playlist_from_obj, _tidal_playlist_from_html, _tidal_items_from_obj,
@@ -38,15 +37,10 @@ check("sanitize_filename strips bad chars", "/" not in utils.sanitize_filename("
 
 # services / country
 check("normalize amazon_music", normalize_service("amazon_music") == "amazon")
-check("default_country qobuz=US", default_country("qobuz") == "US")
+check("default_country qobuz=NL", default_country("qobuz") == "NL")
 check("default_country amazon=''", default_country("amazon") == "")
 check("download country for grilledcheese is auto",
       default_country("grilledcheese") == "")
-check("search country for grilledcheese is XX",
-      search_country("grilledcheese") == "XX")
-check("XX becomes auto only for a grilledcheese item URL",
-      _account_country_for_url("https://lucida.to/i/gc1_token", "XX") == ""
-      and _account_country_for_url("https://play.qobuz.com/track/1", "XX") == "XX")
 check("default_country other=US", default_country("tidal") == "US")
 check("formats", DOWNSCALE_CHOICES[0] == "original" and "flac" in DOWNSCALE_CHOICES)
 check("Apple URL validation accepts playlists only",
@@ -333,6 +327,94 @@ _t2, _ = _org._title_and_ext("Iron Man (2012 - Remaster).flac", {}, prefer_meta_
 check("title: no artist match -> keep stem (no false ' - ' strip)",
       _t2 == "Iron Man (2012 - Remaster)")
 _sh.rmtree(_d4, ignore_errors=True)
+
+# tracknumber fix: 'N/M' composite embedded tags are rewritten to the bare number
+check("bare track number: fraction", _org._bare_track_number("6/12") == "6")
+check("bare track number: spaced fraction", _org._bare_track_number(" 6 / 12 ") == "6")
+check("bare track number: already bare -> None", _org._bare_track_number("6") is None)
+check("bare track number: empty -> None", _org._bare_track_number("") is None)
+check("bare track number: not a pair -> None",
+      _org._bare_track_number("A/12") is None and _org._bare_track_number("6/12/13") is None)
+
+if _org.mutagen_available():
+    from mutagen import File as _mFile
+    from unittest.mock import patch as _tag_patch
+    _d6 = tempfile.mkdtemp(prefix="lucidadl_trackno_")
+
+    def _tagged_flac(name, tracknumber):
+        """A minimal but mutagen-readable FLAC (magic + STREAMINFO, no audio frames)."""
+        p = _os.path.join(_d6, name)
+        info = (4096).to_bytes(2, "big") * 2 + bytes(6) \
+            + ((44100 << 44) | (1 << 41) | (15 << 36)).to_bytes(8, "big") + bytes(16)
+        with open(p, "wb") as fh:
+            fh.write(b"fLaC" + bytes([0x80]) + (34).to_bytes(3, "big") + info)
+        tf = _mFile(p, easy=True)
+        tf["tracknumber"] = tracknumber
+        tf.save()
+        return p
+
+    _fp = _org.place_file(_tagged_flac("t1.flac", "6/12"), _d6,
+                          meta={"albumartist": "AA", "album": "BB"})
+    check("tracknumber fix: '6/12' -> '6' on the placed file",
+          list(_mFile(_fp, easy=True).get("tracknumber") or []) == ["6"])
+    _fp2 = _org.place_file(_tagged_flac("t2.flac", "3"), _d6,
+                           meta={"albumartist": "AA", "album": "BB"})
+    check("tracknumber fix: already-bare value left untouched",
+          list(_mFile(_fp2, easy=True).get("tracknumber") or []) == ["3"])
+
+    # A real partial write must only damage the disposable copy, never the download.
+    _fp3 = _tagged_flac("partial.flac", "6/12")
+    with open(_fp3, "rb") as _fh:
+        _original = _fh.read()
+    _entries_before = set(_os.listdir(_d6))
+
+    def _partial_tag_save(self, filename=None, **kwargs):
+        with open(filename or self.filename, "r+b") as fh:
+            fh.write(b"broken")
+        raise OSError("simulated partial metadata write")
+
+    with _tag_patch.object(type(_mFile(_fp3, easy=True)), "save",
+                           autospec=True, side_effect=_partial_tag_save) as _save:
+        _org.fix_track_number(_fp3)
+    check("tracknumber fix: partial write failure was exercised", _save.call_count == 1)
+    with open(_fp3, "rb") as _fh:
+        check("tracknumber fix: partial write preserves original bytes",
+              _fh.read() == _original)
+    check("tracknumber fix: partial write leaves no temporary file",
+          set(_os.listdir(_d6)) == _entries_before)
+
+    _fp4 = _tagged_flac("replace.flac", "6/12")
+    with open(_fp4, "rb") as _fh:
+        _original = _fh.read()
+    _entries_before = set(_os.listdir(_d6))
+    with _tag_patch.object(_org.os, "replace", side_effect=OSError("file locked")) as _replace:
+        _org.fix_track_number(_fp4)
+    check("tracknumber fix: replacement failure was exercised", _replace.call_count == 1)
+    with open(_fp4, "rb") as _fh:
+        check("tracknumber fix: replacement failure preserves original bytes",
+              _fh.read() == _original)
+    check("tracknumber fix: replacement failure leaves no temporary file",
+          set(_os.listdir(_d6)) == _entries_before)
+
+    def _partial_tag_copy(src, dst):
+        with open(dst, "wb") as fh:
+            fh.write(b"incomplete copy")
+        raise OSError("simulated disk full")
+
+    with _tag_patch.object(_org.shutil, "copy2", side_effect=_partial_tag_copy) as _copy:
+        _org.fix_track_number(_fp4)
+    check("tracknumber fix: copy failure was exercised", _copy.call_count == 1)
+    with open(_fp4, "rb") as _fh:
+        check("tracknumber fix: copy failure preserves original bytes",
+              _fh.read() == _original)
+    check("tracknumber fix: copy failure leaves no temporary file",
+          set(_os.listdir(_d6)) == _entries_before)
+
+    _org.fix_track_number(_fp4)
+    check("tracknumber fix: successful retry saves the bare number and cleans up",
+          list(_mFile(_fp4, easy=True).get("tracknumber") or []) == ["6"]
+          and set(_os.listdir(_d6)) == _entries_before)
+    _sh.rmtree(_d6, ignore_errors=True)
 
 # playlist .m3u8 sidecar: lists audio in track order, bare filenames, with EXTINF titles
 _d5 = tempfile.mkdtemp(prefix="lucidadl_m3u_")
@@ -941,7 +1023,7 @@ _help = _runner.invoke(_cli.cli, ["--help"])
 check("cli: developer debug command is hidden", "  debug " not in _help.output)
 _version = _runner.invoke(_cli.cli, ["--version"])
 check("cli: source version matches release metadata",
-      _version.exit_code == 0 and "1.4.0" in _version.output)
+      _version.exit_code == 0 and "1.4.1" in _version.output)  # x-release-please-version
 
 print()
 if fails:

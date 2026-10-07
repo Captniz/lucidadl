@@ -36,12 +36,12 @@ providers are separate: playlists can originate from any supported service, whil
 lucidadl resolves downloads through Lucida's **Qobuz, Amazon Music, and GrilledCheese**
 providers when they are available.
 
-> **Upstream status — last checked 29 September 2026:** lucida.to has recently been
-> unstable. Amazon Music resolves through the US, UK, and Japan account regions, but
-> availability can vary by region. GrilledCheese completed a real FLAC download; Qobuz
-> did not resolve during its latest check. This is upstream service status, not a
-> limitation of playlist importing. Run `lucida setup` before retrying, and expect
-> provider availability to change without a lucidadl release.
+> **Upstream status — last checked 6 October 2026:** lucida.to remains unstable. Qobuz
+> is available again through its Netherlands account, while Amazon Music resolves in
+> automatic, US, UK, and Japan modes. GrilledCheese no longer exposes an account and
+> currently returns no search results. This is upstream service status, not a limitation
+> of playlist importing. Run `lucida setup` before retrying, and expect availability to
+> change without a lucidadl release.
 
 ![lucidadl public playlist import demo](https://raw.githubusercontent.com/Jude-A/lucidadl/main/docs/assets/lucidadl-demo.gif)
 
@@ -396,8 +396,6 @@ account. Deezer, Amazon Music, and Qobuz are read directly; short Spotify and TI
 lists use their fast public players. Apple Music, YouTube, SoundCloud, and longer
 Spotify/TIDAL lists automatically use a headless browser to load every public position.
 The import stops with a clear error instead of accepting a known partial list.
-Cross-service playlist translation and account authorization remain the responsibility
-of a separate companion project.
 
 ## Interactive menu
 
@@ -538,8 +536,7 @@ Release changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
 lucidadl takes inspiration from
 [lucida-flow](https://github.com/ryanlong1004/lucida-flow) and
-[lucida-downloader](https://github.com/jelni/lucida-downloader). The project started as
-a small, AI-assisted personal tool and remains intentionally focused on that scale.
+[lucida-downloader](https://github.com/jelni/lucida-downloader).
 
 ## License
 
