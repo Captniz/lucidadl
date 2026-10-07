@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1](https://github.com/Jude-A/lucidadl/compare/v1.4.0...v1.4.1) (2026-10-07)
+
+
+### Added
+
+* add validated GrilledCheese downloads ([bf3fa1e](https://github.com/Jude-A/lucidadl/commit/bf3fa1eb87634b3f60bea787c222351c82ec2f16))
+
+
+### Fixed
+
+* follow current Lucida provider regions ([8e0723a](https://github.com/Jude-A/lucidadl/commit/8e0723a190b1b0bcdfe84eb946768645dfd187e1))
+
 ## [Unreleased]
 
 ### Added
